@@ -1,0 +1,58 @@
+#include <Arduino.h>
+#include <U8g2lib.h>
+#include <SPI.h>
+
+// --- PHYSICAL ESP32-C3 HARDWARE MAPPING ---
+// These definitions exactly route your data blocks 
+#define CLOCK_PIN 8   // Connects to Display Pin 10
+#define DATA_PIN 10   // Connects to Display Pin 11
+#define DC_PIN 4      // Connects to Display Pin 9
+#define RESET_PIN 3   // Connects to Display Pin 8
+
+// --- THE UNIVERSAL 4-WIRE SPI CONSTRUCTOR ---
+// Instructs U8g2 to process 128x64 pixels using software SPI emulation
+U8G2_SSD1306_128X64_NONAME_F_4W_SW_SPI u8g2(
+    U8G2_R0, 
+    CLOCK_PIN, 
+    DATA_PIN, 
+    U8X8_PIN_NONE, // No standard Chip Select (CS) line needed
+    DC_PIN, 
+    RESET_PIN
+);
+
+void setup() {
+  // Initialize the native USB/Serial hardware loop
+  Serial.begin(115200);
+  Serial.println("Initializing OLED Display Boot Sequence...");
+
+  // Fire up the screen registers and clear any startup garbage pixels
+  u8g2.begin();
+}
+
+void loop() {
+  // Clear the internal RAM drawing canvas
+  u8g2.clearBuffer(); 
+  
+  // 1. RENDER SOLID SUCCESS TEXT
+  u8g2.setFont(u8g2_font_ncenB10_tr); 
+  u8g2.drawStr(52, 38, "IT WORKS!"); 
+  
+  // 2. CONSTRUCT 3D WIREFRAME OBJECT
+  // Front face frame
+  u8g2.drawFrame(10, 25, 20, 20);
+  // Rear face frame (staggered offset)
+  u8g2.drawFrame(18, 17, 20, 20);
+  // Connecting vectors to establish perspective depth
+  u8g2.drawLine(10, 25, 18, 17); // Top-Left Join
+  u8g2.drawLine(30, 25, 38, 17); // Top-Right Join
+  u8g2.drawLine(10, 45, 18, 37); // Bottom-Left Join
+  u8g2.drawLine(30, 45, 38, 37); // Bottom-Right Join
+  
+  // 3. HARD OUTER BORDER (Confirms full 128x64 pixel range alignment)
+  u8g2.drawFrame(0, 0, 128, 64);
+
+  // Ship the completed layout vector data to the display panel
+  u8g2.sendBuffer(); 
+  
+  delay(100); 
+}

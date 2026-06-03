@@ -1,0 +1,698 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>S-Brush — BLE Controller</title>
+  <meta name="description" content="Wireless BLE controller for the S-Brush ESP32-C3 device. Control power and LED modes from your browser." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    /* ── Design Tokens ────────────────────────────────────────────── */
+    :root {
+      --bg:           #0a0a0f;
+      --surface:      rgba(255,255,255,0.04);
+      --surface-hover:rgba(255,255,255,0.08);
+      --border:       rgba(255,255,255,0.08);
+      --border-active:rgba(124,58,237,0.6);
+      --text:         #f0f0f5;
+      --text-dim:     rgba(240,240,245,0.45);
+      --accent:       #7c3aed;
+      --accent-glow:  rgba(124,58,237,0.35);
+      --accent2:      #06b6d4;
+      --accent2-glow: rgba(6,182,212,0.25);
+      --green:        #10b981;
+      --green-glow:   rgba(16,185,129,0.3);
+      --red:          #f43f5e;
+      --red-glow:     rgba(244,63,94,0.3);
+      --amber:        #f59e0b;
+      --radius:       18px;
+      --radius-sm:    10px;
+      --transition:   0.25s cubic-bezier(0.4,0,0.2,1);
+    }
+
+    /* ── Reset & Base ─────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { height: 100%; }
+    body {
+      min-height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Inter', sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      overflow-x: hidden;
+    }
+
+    /* Subtle animated background */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background:
+        radial-gradient(ellipse 80% 60% at 20% 10%, rgba(124,58,237,0.12) 0%, transparent 60%),
+        radial-gradient(ellipse 60% 50% at 80% 90%, rgba(6,182,212,0.08) 0%, transparent 60%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* ── Layout ───────────────────────────────────────────────────── */
+    .container {
+      position: relative;
+      z-index: 1;
+      width: 100%;
+      max-width: 420px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    /* ── Glass Card ───────────────────────────────────────────────── */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 28px;
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      transition: border-color var(--transition), box-shadow var(--transition);
+    }
+    .card:hover { border-color: rgba(255,255,255,0.12); }
+
+    /* ── Header ───────────────────────────────────────────────────── */
+    .header {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+    .logo {
+      width: 48px;
+      height: 48px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      border-radius: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 22px;
+      flex-shrink: 0;
+      box-shadow: 0 4px 20px var(--accent-glow);
+    }
+    .header-text h1 {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 22px;
+      font-weight: 700;
+      letter-spacing: -0.3px;
+    }
+    .header-text p {
+      font-size: 13px;
+      color: var(--text-dim);
+      margin-top: 2px;
+    }
+
+    /* ── Status Badge ─────────────────────────────────────────────── */
+    .status-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-top: 20px;
+    }
+    .status-badge {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      font-weight: 500;
+      padding: 6px 12px;
+      border-radius: 99px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      transition: all var(--transition);
+    }
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--text-dim);
+      transition: background var(--transition), box-shadow var(--transition);
+    }
+    .status-badge.connected .status-dot {
+      background: var(--green);
+      box-shadow: 0 0 8px var(--green-glow);
+      animation: pulse-dot 2s ease infinite;
+    }
+    .status-badge.connected {
+      border-color: rgba(16,185,129,0.3);
+      color: var(--green);
+    }
+    .status-badge.disconnected .status-dot { background: var(--text-dim); }
+
+    @keyframes pulse-dot {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(16,185,129,0.5); }
+      50%       { box-shadow: 0 0 0 5px rgba(16,185,129,0); }
+    }
+
+    .rssi-label {
+      font-size: 12px;
+      color: var(--text-dim);
+      font-family: 'Space Grotesk', sans-serif;
+    }
+
+    /* ── Connect Button ───────────────────────────────────────────── */
+    .btn-connect {
+      width: 100%;
+      padding: 16px;
+      border-radius: var(--radius);
+      border: 1px solid var(--border-active);
+      background: linear-gradient(135deg, rgba(124,58,237,0.2), rgba(6,182,212,0.1));
+      color: var(--text);
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all var(--transition);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      letter-spacing: 0.2px;
+      position: relative;
+      overflow: hidden;
+    }
+    .btn-connect::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      opacity: 0;
+      transition: opacity var(--transition);
+    }
+    .btn-connect:hover::before { opacity: 0.15; }
+    .btn-connect:hover {
+      box-shadow: 0 0 24px var(--accent-glow);
+      transform: translateY(-1px);
+    }
+    .btn-connect:active { transform: translateY(0); }
+    .btn-connect:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+      transform: none;
+    }
+    .btn-connect span { position: relative; z-index: 1; }
+
+    .btn-connect.connected {
+      border-color: rgba(244,63,94,0.4);
+      background: linear-gradient(135deg, rgba(244,63,94,0.15), rgba(244,63,94,0.05));
+    }
+    .btn-connect.connected::before {
+      background: linear-gradient(135deg, var(--red), transparent);
+    }
+    .btn-connect.connected:hover { box-shadow: 0 0 24px var(--red-glow); }
+
+    /* Scanning spinner */
+    .spinner {
+      width: 16px;
+      height: 16px;
+      border: 2px solid rgba(255,255,255,0.2);
+      border-top-color: var(--text);
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      display: none;
+    }
+    .scanning .spinner { display: block; }
+    .scanning .btn-icon { display: none; }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Section Label ────────────────────────────────────────────── */
+    .section-label {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: var(--text-dim);
+      margin-bottom: 14px;
+    }
+
+    /* ── Power Toggle ─────────────────────────────────────────────── */
+    .power-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+    }
+    .power-info { flex: 1; }
+    .power-info h3 {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 17px;
+      font-weight: 600;
+    }
+    .power-info p {
+      font-size: 13px;
+      color: var(--text-dim);
+      margin-top: 3px;
+    }
+    .power-state-text {
+      transition: color var(--transition);
+    }
+    .power-state-text.on  { color: var(--green); }
+    .power-state-text.off { color: var(--text-dim); }
+
+    /* Toggle switch */
+    .toggle-wrap {
+      position: relative;
+      width: 56px;
+      height: 30px;
+      flex-shrink: 0;
+    }
+    .toggle-wrap input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+      position: absolute;
+    }
+    .toggle-track {
+      position: absolute;
+      inset: 0;
+      background: rgba(255,255,255,0.1);
+      border-radius: 99px;
+      border: 1px solid var(--border);
+      cursor: pointer;
+      transition: all var(--transition);
+    }
+    .toggle-track::after {
+      content: '';
+      position: absolute;
+      top: 3px;
+      left: 3px;
+      width: 22px;
+      height: 22px;
+      background: var(--text-dim);
+      border-radius: 50%;
+      transition: all var(--transition);
+      box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+    }
+    .toggle-wrap input:checked ~ .toggle-track {
+      background: rgba(16,185,129,0.3);
+      border-color: rgba(16,185,129,0.5);
+      box-shadow: 0 0 14px var(--green-glow);
+    }
+    .toggle-wrap input:checked ~ .toggle-track::after {
+      left: calc(100% - 25px);
+      background: var(--green);
+    }
+    .toggle-wrap input:disabled ~ .toggle-track {
+      opacity: 0.35;
+      cursor: not-allowed;
+    }
+
+    /* ── Mode Selector ────────────────────────────────────────────── */
+    .mode-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+    }
+    .mode-btn {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 16px 8px;
+      color: var(--text-dim);
+      font-family: 'Inter', sans-serif;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all var(--transition);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      text-align: center;
+    }
+    .mode-btn:hover:not(:disabled) {
+      background: var(--surface-hover);
+      border-color: rgba(124,58,237,0.4);
+      color: var(--text);
+    }
+    .mode-btn:disabled {
+      opacity: 0.3;
+      cursor: not-allowed;
+    }
+    .mode-btn .mode-icon {
+      font-size: 20px;
+      transition: transform var(--transition);
+    }
+    .mode-btn:hover:not(:disabled) .mode-icon { transform: scale(1.15); }
+
+    .mode-btn.active {
+      background: linear-gradient(135deg, rgba(124,58,237,0.2), rgba(6,182,212,0.1));
+      border-color: var(--border-active);
+      color: var(--text);
+      box-shadow: 0 0 16px var(--accent-glow), inset 0 1px 0 rgba(255,255,255,0.08);
+    }
+    .mode-btn.active .mode-icon { transform: scale(1.1); }
+
+    /* ── Log Panel ────────────────────────────────────────────────── */
+    .log-panel {
+      background: rgba(0,0,0,0.3);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 14px;
+      height: 110px;
+      overflow-y: auto;
+      font-family: 'Space Grotesk', monospace;
+      font-size: 12px;
+      color: var(--text-dim);
+      scroll-behavior: smooth;
+    }
+    .log-panel::-webkit-scrollbar { width: 4px; }
+    .log-panel::-webkit-scrollbar-track { background: transparent; }
+    .log-panel::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+    .log-entry { line-height: 1.6; }
+    .log-entry .ts { color: rgba(255,255,255,0.2); margin-right: 6px; }
+    .log-entry.success { color: var(--green); }
+    .log-entry.error   { color: var(--red); }
+    .log-entry.info    { color: var(--accent2); }
+    .log-entry.warn    { color: var(--amber); }
+
+    /* ── Incompatible warning ─────────────────────────────────────── */
+    #ble-unsupported {
+      background: linear-gradient(135deg, rgba(244,63,94,0.1), rgba(244,63,94,0.05));
+      border: 1px solid rgba(244,63,94,0.3);
+      border-radius: var(--radius);
+      padding: 20px;
+      text-align: center;
+      display: none;
+    }
+    #ble-unsupported h2 { font-family: 'Space Grotesk', sans-serif; font-size: 18px; margin-bottom: 8px; color: var(--red); }
+    #ble-unsupported p  { font-size: 13px; color: var(--text-dim); line-height: 1.6; }
+
+    /* ── Responsive ───────────────────────────────────────────────── */
+    @media (max-width: 480px) {
+      body { padding: 16px; }
+      .card { padding: 20px; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="container" id="main-container">
+
+  <!-- BLE Not Supported Warning (hidden by default) -->
+  <div id="ble-unsupported">
+    <h2 id="ble-unsupported-title">⚠️ Browser Not Supported</h2>
+    <p id="ble-unsupported-msg">Web Bluetooth requires <strong>Google Chrome</strong> or <strong>Microsoft Edge</strong> on Windows, Mac, or Android.<br/>Firefox and Safari are not supported.</p>
+  </div>
+
+  <!-- ── Header Card ─────────────────────────────────────────────── -->
+  <div class="card" id="header-card">
+    <div class="header">
+      <div class="logo">🪥</div>
+      <div class="header-text">
+        <h1>S-Brush</h1>
+        <p>BLE Device Controller</p>
+      </div>
+    </div>
+
+    <div class="status-row">
+      <div class="status-badge disconnected" id="status-badge">
+        <div class="status-dot"></div>
+        <span id="status-text">Disconnected</span>
+      </div>
+      <span class="rssi-label" id="rssi-label"></span>
+    </div>
+  </div>
+
+  <!-- ── Connect Card ────────────────────────────────────────────── -->
+  <div class="card">
+    <button class="btn-connect" id="btn-connect" aria-label="Connect to S-Brush via Bluetooth">
+      <span class="spinner" id="spinner"></span>
+      <span class="btn-icon" id="btn-icon">📡</span>
+      <span id="btn-label">Connect to S-Brush</span>
+    </button>
+  </div>
+
+  <!-- ── Power Card ─────────────────────────────────────────────── -->
+  <div class="card" id="power-card">
+    <div class="section-label">Power</div>
+    <div class="power-row">
+      <div class="power-info">
+        <h3>System Power</h3>
+        <p class="power-state-text off" id="power-state-text">Currently OFF</p>
+      </div>
+      <label class="toggle-wrap" aria-label="Toggle system power">
+        <input type="checkbox" id="power-toggle" disabled />
+        <div class="toggle-track"></div>
+      </label>
+    </div>
+  </div>
+
+  <!-- ── Mode Card ──────────────────────────────────────────────── -->
+  <div class="card" id="mode-card">
+    <div class="section-label">LED Mode</div>
+    <div class="mode-grid">
+      <button class="mode-btn" id="mode-btn-0" disabled aria-label="LED 1 only">
+        <span class="mode-icon">💡</span>
+        <span>LED 1</span>
+      </button>
+      <button class="mode-btn" id="mode-btn-1" disabled aria-label="LED 2 only">
+        <span class="mode-icon">🔦</span>
+        <span>LED 2</span>
+      </button>
+      <button class="mode-btn" id="mode-btn-2" disabled aria-label="Both LEDs on">
+        <span class="mode-icon">✨</span>
+        <span>Both</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- ── Log Card ───────────────────────────────────────────────── -->
+  <div class="card">
+    <div class="section-label">Activity Log</div>
+    <div class="log-panel" id="log-panel" role="log" aria-live="polite" aria-label="Activity log"></div>
+  </div>
+
+</div>
+
+<script>
+  // ── BLE UUIDs (must match firmware) ──────────────────────────────
+  const SERVICE_UUID     = '12345678-1234-1234-1234-123456789abc';
+  const POWER_CHAR_UUID  = '12345678-1234-1234-1234-000000000001';
+  const MODE_CHAR_UUID   = '12345678-1234-1234-1234-000000000002';
+  const STATUS_CHAR_UUID = '12345678-1234-1234-1234-000000000003';
+
+  // ── State ─────────────────────────────────────────────────────────
+  let bleDevice    = null;
+  let bleServer    = null;
+  let powerChar    = null;
+  let modeChar     = null;
+  let statusChar   = null;
+  let isConnected  = false;
+  let systemOn     = false;
+  let currentMode  = 0;
+
+  // ── DOM References ────────────────────────────────────────────────
+  const btnConnect      = document.getElementById('btn-connect');
+  const btnLabel        = document.getElementById('btn-label');
+  const btnIcon         = document.getElementById('btn-icon');
+  const spinner         = document.getElementById('spinner');
+  const statusBadge     = document.getElementById('status-badge');
+  const statusText      = document.getElementById('status-text');
+  const rssiLabel       = document.getElementById('rssi-label');
+  const powerToggle     = document.getElementById('power-toggle');
+  const powerStateText  = document.getElementById('power-state-text');
+  const logPanel        = document.getElementById('log-panel');
+
+  // ── Check Web Bluetooth Support ───────────────────────────────────
+  if (!navigator.bluetooth) {
+    const isHttp = location.protocol === 'http:' && location.hostname !== 'localhost';
+    const titleEl = document.getElementById('ble-unsupported-title');
+    const msgEl   = document.getElementById('ble-unsupported-msg');
+    if (isHttp) {
+      titleEl.textContent = '⚠️ HTTPS Required';
+      msgEl.innerHTML = 'Web Bluetooth only works over a <strong>secure (HTTPS)</strong> connection.<br/>'
+        + 'Open this page via <strong>https://</strong> or use a tunnelling service like '
+        + '<a href="https://ngrok.com" target="_blank" style="color:var(--accent)">ngrok</a> or '
+        + '<a href="https://tailscale.com" target="_blank" style="color:var(--accent)">Tailscale</a>.';
+    }
+    document.getElementById('ble-unsupported').style.display = 'block';
+    document.getElementById('header-card').style.display = 'none';
+    document.querySelectorAll('.card:not(#header-card)').forEach(c => c.style.display = 'none');
+    log(isHttp ? 'Web Bluetooth blocked: page must be served over HTTPS.' : 'Web Bluetooth not supported in this browser.', 'error');
+  }
+
+  // ── Logging ───────────────────────────────────────────────────────
+  function log(msg, type = 'default') {
+    const entry = document.createElement('div');
+    entry.className = `log-entry ${type}`;
+    const now = new Date();
+    const ts = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')}`;
+    entry.innerHTML = `<span class="ts">${ts}</span>${msg}`;
+    logPanel.appendChild(entry);
+    logPanel.scrollTop = logPanel.scrollHeight;
+  }
+
+  // ── UI State Sync ─────────────────────────────────────────────────
+  function setConnectedUI(connected) {
+    isConnected = connected;
+    statusBadge.className = `status-badge ${connected ? 'connected' : 'disconnected'}`;
+    statusText.textContent = connected ? 'Connected' : 'Disconnected';
+    btnConnect.className   = `btn-connect ${connected ? 'connected' : ''}`;
+    btnLabel.textContent   = connected ? 'Disconnect' : 'Connect to S-Brush';
+    btnIcon.textContent    = connected ? '✕' : '📡';
+    powerToggle.disabled   = !connected;
+    [0, 1, 2].forEach(i => {
+      document.getElementById(`mode-btn-${i}`).disabled = !connected || !systemOn;
+    });
+    if (!connected) {
+      rssiLabel.textContent = '';
+      setScanningUI(false);
+    }
+  }
+
+  function setScanningUI(scanning) {
+    btnConnect.disabled = scanning;
+    btnConnect.classList.toggle('scanning', scanning);
+    spinner.style.display = scanning ? 'block' : 'none';
+    btnIcon.style.display = scanning ? 'none' : 'inline';
+    btnLabel.textContent  = scanning ? 'Scanning…' : (isConnected ? 'Disconnect' : 'Connect to S-Brush');
+  }
+
+  function applyDeviceState(power, mode) {
+    systemOn    = power;
+    currentMode = mode;
+
+    powerToggle.checked = power;
+    powerStateText.textContent = power ? 'Currently ON' : 'Currently OFF';
+    powerStateText.className = `power-state-text ${power ? 'on' : 'off'}`;
+
+    [0, 1, 2].forEach(i => {
+      const btn = document.getElementById(`mode-btn-${i}`);
+      btn.classList.toggle('active', i === mode);
+      btn.disabled = !isConnected || !power;
+    });
+  }
+
+  // ── BLE Connection ────────────────────────────────────────────────
+  async function connect() {
+    try {
+      setScanningUI(true);
+      log('Scanning for S-Brush…', 'info');
+
+      bleDevice = await navigator.bluetooth.requestDevice({
+        filters: [{ services: [SERVICE_UUID] }],
+        optionalServices: [SERVICE_UUID]
+      });
+
+      bleDevice.addEventListener('gattserverdisconnected', onDisconnect);
+      log(`Found device: ${bleDevice.name}`, 'info');
+
+      bleServer = await bleDevice.gatt.connect();
+      log('GATT connected', 'info');
+
+      const service = await bleServer.getPrimaryService(SERVICE_UUID);
+      powerChar  = await service.getCharacteristic(POWER_CHAR_UUID);
+      modeChar   = await service.getCharacteristic(MODE_CHAR_UUID);
+      statusChar = await service.getCharacteristic(STATUS_CHAR_UUID);
+
+      // Subscribe to status notifications
+      await statusChar.startNotifications();
+      statusChar.addEventListener('characteristicvaluechanged', onStatusNotify);
+
+      // Read initial state
+      const initVal = await statusChar.readValue();
+      const initPower = initVal.getUint8(0) === 0x01;
+      const initMode  = initVal.getUint8(1);
+      applyDeviceState(initPower, initMode);
+
+      setConnectedUI(true);
+      log('✓ S-Brush connected!', 'success');
+
+    } catch (err) {
+      setScanningUI(false);
+      if (err.name === 'NotFoundError') {
+        log('No device selected or not found.', 'warn');
+      } else {
+        log(`Connection failed: ${err.message}`, 'error');
+      }
+    }
+  }
+
+  async function disconnect() {
+    try {
+      if (statusChar) {
+        statusChar.removeEventListener('characteristicvaluechanged', onStatusNotify);
+        await statusChar.stopNotifications().catch(() => {});
+      }
+      if (bleDevice && bleDevice.gatt.connected) {
+        bleDevice.gatt.disconnect();
+      }
+    } catch (err) {
+      log(`Disconnect error: ${err.message}`, 'error');
+    }
+  }
+
+  function onDisconnect() {
+    powerChar = modeChar = statusChar = null;
+    bleServer = null;
+    setConnectedUI(false);
+    applyDeviceState(false, 0);
+    log('Device disconnected.', 'warn');
+  }
+
+  function onStatusNotify(event) {
+    const val   = event.target.value;
+    const power = val.getUint8(0) === 0x01;
+    const mode  = val.getUint8(1);
+    applyDeviceState(power, mode);
+    log(`Status update → power:${power ? 'ON' : 'OFF'} mode:${mode}`, 'info');
+  }
+
+  // ── BLE Writes ────────────────────────────────────────────────────
+  async function writePower(on) {
+    if (!powerChar) return;
+    try {
+      await powerChar.writeValueWithResponse(new Uint8Array([on ? 0x01 : 0x00]));
+      log(`Power → ${on ? 'ON' : 'OFF'}`, 'success');
+    } catch (err) {
+      log(`Power write failed: ${err.message}`, 'error');
+    }
+  }
+
+  async function writeMode(mode) {
+    if (!modeChar) return;
+    try {
+      await modeChar.writeValueWithResponse(new Uint8Array([mode]));
+      log(`Mode → ${['LED 1','LED 2','Both'][mode]}`, 'success');
+    } catch (err) {
+      log(`Mode write failed: ${err.message}`, 'error');
+    }
+  }
+
+  // ── Event Listeners ───────────────────────────────────────────────
+  btnConnect.addEventListener('click', () => {
+    if (isConnected) {
+      disconnect();
+    } else {
+      connect();
+    }
+  });
+
+  powerToggle.addEventListener('change', () => {
+    writePower(powerToggle.checked);
+  });
+
+  [0, 1, 2].forEach(i => {
+    document.getElementById(`mode-btn-${i}`).addEventListener('click', () => {
+      writeMode(i);
+    });
+  });
+
+  // ── Init Log ──────────────────────────────────────────────────────
+  log('S-Brush controller ready. Click Connect to begin.', 'info');
+</script>
+</body>
+</html>

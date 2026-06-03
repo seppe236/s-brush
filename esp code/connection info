@@ -1,0 +1,35 @@
+This is fantastic news! Dropping that third LED is exactly what we needed to make this work without headaches.
+
+Because you only need 10 pins now instead of 11, we can completely avoid GPIO 2 (the most dangerous pin on the board). We can also map your remaining pins so that your active-high LEDs (wired from Pin ➔ Resistor ➔ LED ➔ Ground) will not cause a boot-loop.
+
+Here is your new, safe, active-high pinout:
+
+🔘 The Buttons (Wire to Ground, use INPUT_PULLUP in code)
+GPIO 3 ➔ Power/Wake Button: This is your RTC pin. It is 100% safe to wake from deep sleep.
+
+GPIO 9 ➔ Action Button: This is the BOOT pin. This is safe to use as a button! Because a button wired to Ground is "open" (disconnected) when you aren't pushing it, the pin naturally stays HIGH during power-up. Just don't hold this button down while plugging the board in, and it will boot perfectly.
+
+💡 The 2 LEDs (Active-High: Pin ➔ Resistor ➔ LED ➔ GND)
+GPIO 10 ➔ LED 1: 100% safe. You can do whatever you want with this pin.
+
+GPIO 8 ➔ LED 2: The clever workaround. If you wire this active-high, the LED circuit acts as a slight pull-down to Ground. On the ESP32-C3, if GPIO 8 is pulled low during boot, it simply mutes the internal background boot text in the Serial Monitor. It will not crash the board. The chip will still boot normally, your code will run, and exactly as you mentioned, the LED will light up briefly when you plug it in until your code turns it off.
+
+⚙️ The H-Bridge (Motors)
+GPIO 0 ➔ H-Bridge Pin 1
+
+GPIO 1 ➔ H-Bridge Pin 2
+
+Why? Moving the H-Bridge to these pins guarantees no weird signals are sent to your motors while the chip is booting up. They will stay dead silent until your code activates them.
+
+📺 The Display (SPI)
+GPIO 4 ➔ SPI SCK
+
+GPIO 6 ➔ SPI MOSI
+
+GPIO 7 ➔ SPI CS
+
+GPIO 5 ➔ SPI DC (or Backlight)
+
+Why? These stay safely on their default pins, meaning you won't have to write any complex custom SPI mapping code.
+
+By laying it out exactly like this, you get your active-high LEDs, you have plenty of standard pins for your display and motors, and you avoid the GPIO 2 trap entirely!
