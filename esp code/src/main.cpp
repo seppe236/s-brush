@@ -12,6 +12,22 @@ NimBLECharacteristic* pRxChar = nullptr;
 bool deviceConnected = false;
 unsigned long lastMsgTime = 0;
 
+
+void ble_send(String msg){
+  pTxChar->setValue(msg.c_str());
+  pTxChar->notify();
+}
+
+
+
+void code_upload(String code) {
+  String parts[] = code.split('\n');
+  for(int i = 0; i < parts.length(); i++) {
+    ble_send(parts[i]);
+
+  }
+}
+
 class ServerCallbacks : public NimBLEServerCallbacks {
   void onConnect(NimBLEServer* pSvr, NimBLEConnInfo& connInfo) override {
     deviceConnected = true;
@@ -28,13 +44,15 @@ class RxCallbacks : public NimBLECharacteristicCallbacks {
   void onWrite(NimBLECharacteristic* pChar, NimBLEConnInfo& connInfo) override {
     std::string val = pChar->getValue();
     if (val.length() > 0) {
-      Serial.print("Received via BLE: ");
-      Serial.println(val.c_str());
+      if(val[0] == 'a'){
+        code_upload(val);
+      }
     }
   }
 };
 
 void setup() {
+  setCpuFrequencyMhz(80); // Lower CPU frequency to reduce heat
   Serial.begin(115200);
   Serial.println("Starting BLE Basic Communication...");
 
@@ -60,7 +78,7 @@ void setup() {
     NIMBLE_PROPERTY::NOTIFY
   );
 
-  pService->start();
+  // pService->start(); // Deprecated in newer NimBLE versions
 
   NimBLEAdvertising* pAdv = NimBLEDevice::getAdvertising();
   pAdv->addServiceUUID(SERVICE_UUID);
@@ -78,9 +96,7 @@ void loop() {
     if (millis() - lastMsgTime > 5000) {
       lastMsgTime = millis();
       String msg = "Ping from ESP32! Uptime: " + String(millis() / 1000) + "s";
-      pTxChar->setValue(msg.c_str());
-      pTxChar->notify();
-      Serial.println("Sent: " + msg);
+      ble_send(msg);
     }
   }
   
