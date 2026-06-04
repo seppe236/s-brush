@@ -1,5 +1,6 @@
 #include <Arduino.h>
 #include <NimBLEDevice.h>
+#include <vector>
 
 // ─── BLE UUIDs ─────────────────────────────────────────────────────────────
 #define SERVICE_UUID        "12345678-1234-1234-1234-123456789abc"
@@ -20,11 +21,28 @@ void ble_send(String msg){
 
 
 
-void code_upload(String code) {
-  String parts[] = code.split('\n');
-  for(int i = 0; i < parts.length(); i++) {
-    ble_send(parts[i]);
+std::vector<String> split_str(String str, char delimiter) {
+  std::vector<String> result;
+  int startIdx = 0;
+  int endIdx = str.indexOf(delimiter);
+  
+  while (endIdx != -1) {
+    result.push_back(str.substring(startIdx, endIdx));
+    startIdx = endIdx + 1;
+    endIdx = str.indexOf(delimiter, startIdx);
+  }
+  
+  if (startIdx < str.length()) {
+    result.push_back(str.substring(startIdx));
+  }
+  
+  return result;
+}
 
+void code_upload(String code) {
+  std::vector<String> parts = split_str(code, '\n');
+  for(size_t i = 0; i < parts.size(); i++) {
+    ble_send(parts[i]+'\n');
   }
 }
 
@@ -45,7 +63,7 @@ class RxCallbacks : public NimBLECharacteristicCallbacks {
     std::string val = pChar->getValue();
     if (val.length() > 0) {
       if(val[0] == 'a'){
-        code_upload(val);
+        code_upload(String(val.c_str()));
       }
     }
   }

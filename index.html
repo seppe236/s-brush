@@ -182,12 +182,14 @@
   };
 
   async function sendMessage() {
-    const msg = inputMsg.value.trim();
+    let msg = inputMsg.value.trim();
     if (!msg || !rxChar) return;
     try {
-      const data = new TextEncoder().encode(msg);
+      // Convert literal \n and \r typed by the user into actual newline/carriage return characters
+      const parsedMsg = msg.replace(/\\n/g, '\n').replace(/\\r/g, '\r');
+      const data = new TextEncoder().encode(parsedMsg);
       await rxChar.writeValueWithoutResponse(data);
-      addLog(`TX: ${msg}`, 'tx');
+      addLog(`TX: ${parsedMsg}`, 'tx');
       inputMsg.value = '';
     } catch (err) {
       addLog(`Send Error: ${err.message}`, 'sys');
