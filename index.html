@@ -1,23 +1,32 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>S-Brush — Basic BLE</title>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet" />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;700&display=swap"
+    rel="stylesheet" />
   <style>
     :root {
       --bg: #0a0a0f;
-      --surface: rgba(255,255,255,0.04);
-      --border: rgba(255,255,255,0.08);
+      --surface: rgba(255, 255, 255, 0.04);
+      --border: rgba(255, 255, 255, 0.08);
       --text: #f0f0f5;
-      --text-dim: rgba(240,240,245,0.45);
+      --text-dim: rgba(240, 240, 245, 0.45);
       --accent: #7c3aed;
       --accent2: #06b6d4;
       --radius: 16px;
-      --transition: 0.25s cubic-bezier(0.4,0,0.2,1);
+      --transition: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
     }
-    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
     body {
       background: var(--bg);
       color: var(--text);
@@ -28,16 +37,25 @@
       padding: 40px 24px;
       min-height: 100vh;
     }
+
     body::before {
-      content: ''; position: fixed; inset: 0;
-      background: radial-gradient(ellipse 80% 60% at 20% 10%, rgba(124,58,237,0.1) 0%, transparent 60%),
-                  radial-gradient(ellipse 60% 50% at 80% 90%, rgba(6,182,212,0.08) 0%, transparent 60%);
-      pointer-events: none; z-index: -1;
+      content: '';
+      position: fixed;
+      inset: 0;
+      background: radial-gradient(ellipse 80% 60% at 20% 10%, rgba(124, 58, 237, 0.1) 0%, transparent 60%),
+        radial-gradient(ellipse 60% 50% at 80% 90%, rgba(6, 182, 212, 0.08) 0%, transparent 60%);
+      pointer-events: none;
+      z-index: -1;
     }
+
     .container {
-      width: 100%; max-width: 480px;
-      display: flex; flex-direction: column; gap: 16px;
+      width: 100%;
+      max-width: 480px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
     }
+
     .card {
       background: var(--surface);
       border: 1px solid var(--border);
@@ -45,161 +63,256 @@
       padding: 24px;
       backdrop-filter: blur(20px);
     }
-    h1 { font-family: 'Space Grotesk', sans-serif; font-size: 24px; margin-bottom: 4px; }
-    p.subtitle { color: var(--text-dim); font-size: 14px; margin-bottom: 24px; }
-    
+
+    h1 {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 24px;
+      margin-bottom: 4px;
+    }
+
+    p.subtitle {
+      color: var(--text-dim);
+      font-size: 14px;
+      margin-bottom: 24px;
+    }
+
     .btn {
-      width: 100%; padding: 14px; border-radius: 12px;
-      border: none; cursor: pointer; font-weight: 600;
+      width: 100%;
+      padding: 14px;
+      border-radius: 12px;
+      border: none;
+      cursor: pointer;
+      font-weight: 600;
       transition: all var(--transition);
       font-family: 'Space Grotesk', sans-serif;
       font-size: 15px;
     }
+
     .btn-primary {
       background: linear-gradient(135deg, var(--accent), var(--accent2));
       color: #fff;
     }
-    .btn-primary:hover:not(:disabled) { box-shadow: 0 4px 20px rgba(124,58,237,0.4); transform: translateY(-1px); }
-    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
-    
-    .input-group { display: flex; gap: 8px; margin-top: 16px; }
+
+    .btn-primary:hover:not(:disabled) {
+      box-shadow: 0 4px 20px rgba(124, 58, 237, 0.4);
+      transform: translateY(-1px);
+    }
+
+    .btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .input-group {
+      display: flex;
+      gap: 8px;
+      margin-top: 16px;
+    }
+
     input[type="text"] {
-      flex: 1; padding: 14px; border-radius: 12px;
-      background: rgba(0,0,0,0.2); border: 1px solid var(--border);
-      color: var(--text); font-family: 'Inter', sans-serif;
+      flex: 1;
+      padding: 14px;
+      border-radius: 12px;
+      background: rgba(0, 0, 0, 0.2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      font-family: 'Inter', sans-serif;
     }
-    input[type="text"]:focus { outline: none; border-color: var(--accent2); }
+
+    input[type="text"]:focus {
+      outline: none;
+      border-color: var(--accent2);
+    }
+
     .btn-send {
-      width: auto; padding: 0 24px; background: rgba(255,255,255,0.1); color: var(--text);
+      width: auto;
+      padding: 0 24px;
+      background: rgba(255, 255, 255, 0.1);
+      color: var(--text);
     }
-    .btn-send:hover:not(:disabled) { background: rgba(255,255,255,0.15); }
-    
+
+    .btn-send:hover:not(:disabled) {
+      background: rgba(255, 255, 255, 0.15);
+    }
+
     .log {
-      background: rgba(0,0,0,0.3); border-radius: 12px; padding: 16px;
-      height: 400px; overflow-y: auto; font-family: monospace;
-      font-size: 13px; color: var(--text-dim);
-      display: flex; flex-direction: column; gap: 6px;
+      background: rgba(0, 0, 0, 0.3);
+      border-radius: 12px;
+      padding: 16px;
+      height: 400px;
+      overflow-y: auto;
+      font-family: monospace;
+      font-size: 13px;
+      color: var(--text-dim);
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
     }
-    .log-entry { white-space: pre-wrap; word-break: break-all; }
-    .log-entry.rx { color: var(--accent2); }
-    .log-entry.tx { color: var(--text); }
-    .log-entry.sys { color: var(--accent); }
-    
-    .status { display: flex; align-items: center; gap: 8px; font-size: 13px; margin-bottom: 16px; }
-    .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--text-dim); }
-    .dot.connected { background: #10b981; box-shadow: 0 0 8px rgba(16,185,129,0.5); }
+
+    .log-entry {
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+
+    .log-entry.rx {
+      color: var(--accent2);
+    }
+
+    .log-entry.tx {
+      color: var(--text);
+    }
+
+    .log-entry.sys {
+      color: var(--accent);
+    }
+
+    .status {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      margin-bottom: 16px;
+    }
+
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--text-dim);
+    }
+
+    .dot.connected {
+      background: #10b981;
+      box-shadow: 0 0 8px rgba(16, 185, 129, 0.5);
+    }
   </style>
 </head>
+
 <body>
 
-<div class="container">
-  <div class="card">
-    <h1>S-Brush Link</h1>
-    <p class="subtitle">Basic Two-Way BLE Communication</p>
-    
-    <div class="status">
-      <div class="dot" id="statusDot"></div>
-      <span id="statusText">Disconnected</span>
+  <div class="container">
+    <div class="card">
+      <h1>S-Brush Link</h1>
+      <p class="subtitle">Basic Two-Way BLE Communication</p>
+
+      <div class="status">
+        <div class="dot" id="statusDot"></div>
+        <span id="statusText">Disconnected</span>
+      </div>
+
+      <button class="btn btn-primary" id="connectBtn">Connect to Device</button>
+
+      <div class="input-group">
+        <input type="text" id="inputMsg" placeholder="Message to send..." disabled />
+        <button class="btn btn-send" id="sendBtn" disabled>Send</button>
+      </div>
     </div>
-    
-    <button class="btn btn-primary" id="connectBtn">Connect to Device</button>
-    
-    <div class="input-group">
-      <input type="text" id="inputMsg" placeholder="Message to send..." disabled />
-      <button class="btn btn-send" id="sendBtn" disabled>Send</button>
+
+    <div class="card">
+      <div class="log" id="log"></div>
     </div>
   </div>
 
-  <div class="card">
-    <div class="log" id="log"></div>
-  </div>
-</div>
+  <script>
+    const SERVICE_UUID = '12345678-1234-1234-1234-123456789abc';
+    const RX_CHAR_UUID = '12345678-1234-1234-1234-000000000001'; // Write to ESP
+    const TX_CHAR_UUID = '12345678-1234-1234-1234-000000000002'; // Notify from ESP
 
-<script>
-  const SERVICE_UUID = '12345678-1234-1234-1234-123456789abc';
-  const RX_CHAR_UUID = '12345678-1234-1234-1234-000000000001'; // Write to ESP
-  const TX_CHAR_UUID = '12345678-1234-1234-1234-000000000002'; // Notify from ESP
+    let device, server, rxChar, txChar;
+    let isConnected = false;
 
-  let device, server, rxChar, txChar;
-  let isConnected = false;
+    const connectBtn = document.getElementById('connectBtn');
+    const inputMsg = document.getElementById('inputMsg');
+    const sendBtn = document.getElementById('sendBtn');
+    const logEl = document.getElementById('log');
+    const statusDot = document.getElementById('statusDot');
+    const statusText = document.getElementById('statusText');
 
-  const connectBtn = document.getElementById('connectBtn');
-  const inputMsg = document.getElementById('inputMsg');
-  const sendBtn = document.getElementById('sendBtn');
-  const logEl = document.getElementById('log');
-  const statusDot = document.getElementById('statusDot');
-  const statusText = document.getElementById('statusText');
-
-  function addLog(msg, type = 'sys') {
-    const el = document.createElement('div');
-    el.className = `log-entry ${type}`;
-    el.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
-    logEl.appendChild(el);
-    logEl.scrollTop = logEl.scrollHeight;
-  }
-
-  function updateUI(connected) {
-    isConnected = connected;
-    connectBtn.textContent = connected ? 'Disconnect' : 'Connect to Device';
-    inputMsg.disabled = !connected;
-    sendBtn.disabled = !connected;
-    statusDot.className = `dot ${connected ? 'connected' : ''}`;
-    statusText.textContent = connected ? 'Connected' : 'Disconnected';
-  }
-
-  connectBtn.onclick = async () => {
-    if (isConnected) {
-      if (device) device.gatt.disconnect();
-      return;
+    function addLog(msg, type = 'sys') {
+      const el = document.createElement('div');
+      el.className = `log-entry ${type}`;
+      el.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+      logEl.appendChild(el);
+      logEl.scrollTop = logEl.scrollHeight;
     }
-    try {
-      addLog('Requesting device...');
-      device = await navigator.bluetooth.requestDevice({
-        filters: [{ services: [SERVICE_UUID] }]
-      });
-      device.addEventListener('gattserverdisconnected', () => {
-        addLog('Device disconnected', 'sys');
-        updateUI(false);
-      });
-      
-      addLog('Connecting to GATT server...');
-      server = await device.gatt.connect();
-      
-      const service = await server.getPrimaryService(SERVICE_UUID);
-      rxChar = await service.getCharacteristic(RX_CHAR_UUID);
-      txChar = await service.getCharacteristic(TX_CHAR_UUID);
-      
-      await txChar.startNotifications();
-      txChar.addEventListener('characteristicvaluechanged', (e) => {
-        const val = new TextDecoder().decode(e.target.value);
-        addLog(`RX: ${val}`, 'rx');
-      });
-      
-      addLog('Ready for communication', 'sys');
-      updateUI(true);
-    } catch (err) {
-      addLog(`Error: ${err.message}`, 'sys');
-    }
-  };
 
-  async function sendMessage() {
-    let msg = inputMsg.value.trim();
-    if (!msg || !rxChar) return;
-    try {
-      // Convert literal \n and \r typed by the user into actual newline/carriage return characters
-      const parsedMsg = msg.replace(/\\n/g, '\n').replace(/\\r/g, '\r');
-      const data = new TextEncoder().encode(parsedMsg);
-      await rxChar.writeValueWithoutResponse(data);
-      addLog(`TX: ${parsedMsg}`, 'tx');
-      inputMsg.value = '';
-    } catch (err) {
-      addLog(`Send Error: ${err.message}`, 'sys');
+    function updateUI(connected) {
+      isConnected = connected;
+      connectBtn.textContent = connected ? 'Disconnect' : 'Connect to Device';
+      inputMsg.disabled = !connected;
+      sendBtn.disabled = !connected;
+      statusDot.className = `dot ${connected ? 'connected' : ''}`;
+      statusText.textContent = connected ? 'Connected' : 'Disconnected';
     }
-  }
 
-  sendBtn.onclick = sendMessage;
-  inputMsg.onkeypress = (e) => { if (e.key === 'Enter') sendMessage(); };
-</script>
+    connectBtn.onclick = async () => {
+      if (isConnected) {
+        if (device) device.gatt.disconnect();
+        return;
+      }
+      try {
+        addLog('Requesting device...');
+        device = await navigator.bluetooth.requestDevice({
+          filters: [{ services: [SERVICE_UUID] }]
+        });
+        device.addEventListener('gattserverdisconnected', () => {
+          addLog('Device disconnected', 'sys');
+          updateUI(false);
+        });
+
+        addLog('Connecting to GATT server...');
+        server = await device.gatt.connect();
+
+        const service = await server.getPrimaryService(SERVICE_UUID);
+        rxChar = await service.getCharacteristic(RX_CHAR_UUID);
+        txChar = await service.getCharacteristic(TX_CHAR_UUID);
+
+        await txChar.startNotifications();
+        txChar.addEventListener('characteristicvaluechanged', (e) => {
+          const val = new TextDecoder().decode(e.target.value);
+          addLog(`RX: ${val}`, 'rx');
+        });
+
+        addLog('Ready for communication', 'sys');
+        updateUI(true);
+      } catch (err) {
+        addLog(`Error: ${err.message}`, 'sys');
+      }
+    };
+
+    async function sendMessage() {
+      let msg = inputMsg.value.trim();
+      if (!msg || !rxChar) return;
+      try {
+        // Convert literal \n and \r typed by the user into actual characters
+        const parsedMsg = msg.replace(/\\n/g, '\n').replace(/\\r/g, '\r');
+        const data = new TextEncoder().encode(parsedMsg);
+
+        addLog(`TX Started (${data.length} bytes)`, 'tx');
+
+        // Chunk size limit for standard BLE packets
+        const CHUNK_SIZE = 20;
+
+        // Loop through data and send 20 bytes at a time
+        for (let i = 0; i < data.length; i += CHUNK_SIZE) {
+          const chunk = data.slice(i, i + CHUNK_SIZE);
+          await rxChar.writeValueWithoutResponse(chunk);
+
+          // Tiny pause between packets so the ESP32 doesn't drop incoming data
+          await new Promise(resolve => setTimeout(resolve, 15));
+        }
+
+        addLog(`TX Complete`, 'tx');
+        inputMsg.value = '';
+      } catch (err) {
+        addLog(`Send Error: ${err.message}`, 'sys');
+      }
+    }
+
+    sendBtn.onclick = sendMessage;
+    inputMsg.onkeypress = (e) => { if (e.key === 'Enter') sendMessage(); };
+  </script>
 
 </body>
+
 </html>
