@@ -2,6 +2,10 @@
 #include <NimBLEDevice.h>
 #include <vector>
 
+// ─── Pin Definitions ───────────────────────────────────────────────────────
+const int POWER_BUTTON_PIN  = 3;
+const int ACTION_BUTTON_PIN = 9;
+
 // ─── BLE UUIDs ─────────────────────────────────────────────────────────────
 #define SERVICE_UUID        "12345678-1234-1234-1234-123456789abc"
 #define RX_CHAR_UUID        "12345678-1234-1234-1234-000000000001" // Client writes to this
@@ -12,6 +16,8 @@ NimBLECharacteristic* pTxChar = nullptr;
 NimBLECharacteristic* pRxChar = nullptr;
 bool deviceConnected = false;
 unsigned long lastMsgTime = 0;
+std::vector<String> receiveBuffer;
+unsigned long bothPressedTime = 0;
 
 
 void ble_send(String msg){
@@ -21,28 +27,37 @@ void ble_send(String msg){
 
 
 
-std::vector<String> split_str(String str, char delimiter) {
-  std::vector<String> result;
-  int startIdx = 0;
-  int endIdx = str.indexOf(delimiter);
+String split_str(String data, char separator, int index) {
+  int found = 0;
+  int startIndex = 0;
+  int endIndex = data.indexOf(separator);
   
-  while (endIdx != -1) {
-    result.push_back(str.substring(startIdx, endIdx));
-    startIdx = endIdx + 1;
-    endIdx = str.indexOf(delimiter, startIdx);
+  while (endIndex != -1) {
+    if (found == index) {
+      return data.substring(startIndex, endIndex);
+    }
+    found++;
+    startIndex = endIndex + 1;
+    endIndex = data.indexOf(separator, startIndex);
   }
   
-  if (startIdx < str.length()) {
-    result.push_back(str.substring(startIdx));
+  if (found == index) {
+    return data.substring(startIndex);
   }
   
-  return result;
+  return "";
 }
 
 void code_upload(String code) {
-  std::vector<String> parts = split_str(code, '\n');
-  for(size_t i = 0; i < parts.size(); i++) {
-    ble_send(parts[i]+'\n');
+  int numTokens = 1;
+  for (int i = 0; i < code.length(); i++) {
+    if (code[i] == '\n') numTokens++;
+  }
+  
+  for(int i = 0; i < numTokens; i++) {
+    String part = split_str(code, '\n', i);
+    ble_send(part + '\n');
+    delay(200);
   }
 }
 
@@ -62,15 +77,15 @@ class RxCallbacks : public NimBLECharacteristicCallbacks {
   void onWrite(NimBLECharacteristic* pChar, NimBLEConnInfo& connInfo) override {
     std::string val = pChar->getValue();
     if (val.length() > 0) {
-      if(val[0] == 'a'){
-        code_upload(String(val.c_str()));
-      }
+      receiveBuffer.push_back(String(val.c_str()));
     }
   }
 };
 
 void setup() {
   setCpuFrequencyMhz(80); // Lower CPU frequency to reduce heat
+  pinMode(POWER_BUTTON_PIN, INPUT_PULLUP);
+  pinMode(ACTION_BUTTON_PIN, INPUT_PULLUP);
   Serial.begin(115200);
   Serial.println("Starting BLE Basic Communication...");
 
@@ -109,6 +124,26 @@ void setup() {
 }
 
 void loop() {
+  if (!receiveBuffer.empty()) {
+    String pending = receiveBuffer.front();
+    receiveBuffer.erase(receiveBuffer.begin());
+    if (pending.length() > 0 && pending[0] == 'a') {
+      code_upload(pending);
+    }
+  }
+
+  // Check buttons for restart
+  if (digitalRead(POWER_BUTTON_PIN) == LOW && digitalRead(ACTION_BUTTON_PIN) == LOW) {
+    if (bothPressedTime == 0) {
+      bothPressedTime = millis();
+    } else if (millis() - bothPressedTime > 3000) {
+      Serial.println("Both buttons held for 3s. Restarting...");
+      ESP.restart();
+    }
+  } else {
+    bothPressedTime = 0;
+  }
+
   // Send a ping message to the client every 5 seconds if connected
   if (deviceConnected) {
     if (millis() - lastMsgTime > 5000) {
