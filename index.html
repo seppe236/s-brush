@@ -287,20 +287,25 @@
       try {
         // Convert literal \n and \r typed by the user into actual characters
         const parsedMsg = msg.replace(/\\n/g, '\n').replace(/\\r/g, '\r');
-        const data = new TextEncoder().encode(parsedMsg);
 
-        addLog(`TX Started (${data.length} bytes)`, 'tx');
+        // Encode payload first to get exact byte count for the frame header
+        const payloadBytes = new TextEncoder().encode(parsedMsg);
 
-        // Chunk size limit for standard BLE packets
+        // Frame the message: L<payloadLength>|<payload>
+        // ESP32 buffers chunks until it has received exactly payloadLength bytes
+        const framedMsg = 'L' + payloadBytes.length + '|' + parsedMsg;
+        const data = new TextEncoder().encode(framedMsg);
+
+        addLog(`TX Started (${payloadBytes.length} bytes)`, 'tx');
+
         const CHUNK_SIZE = 20;
 
-        // Loop through data and send 20 bytes at a time
         for (let i = 0; i < data.length; i += CHUNK_SIZE) {
           const chunk = data.slice(i, i + CHUNK_SIZE);
-          await rxChar.writeValueWithoutResponse(chunk);
 
-          // Tiny pause between packets so the ESP32 doesn't drop incoming data
-          await new Promise(resolve => setTimeout(resolve, 15));
+          // writeValueWithResponse = acknowledged write, matches NIMBLE_PROPERTY::WRITE
+          // The ESP32 confirms each packet before we send the next — no dropped chunks
+          await rxChar.writeValueWithResponse(chunk);
         }
 
         addLog(`TX Complete`, 'tx');

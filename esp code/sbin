@@ -1,3 +1,2 @@
 a
-cmain\rset\rscore\r\r10
-print\rscore
+cmain\rset\rscore\r\r10|print\rscore|wait\r1000|goto\r0
